@@ -1,0 +1,8 @@
+DEFAULT_RENDERER
+arnold
+
+KATANA_RESOURCES
+C:\Users\Yotta\ktoa\ktoa-4.4.3.1-kat8.0-windows
+
+PATH
+C:\Users\Yotta\ktoa\ktoa-4.4.3.1-kat8.0-windows\bin;%PATH%
