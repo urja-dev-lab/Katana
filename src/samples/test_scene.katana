@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<katana>
-  <nodes>
-    <node name="Constant1" type="Constant">
-      <parameters>
-        <parameter name="color" type="Color3">0.5 0.5 0.5

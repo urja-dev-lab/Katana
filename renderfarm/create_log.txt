@@ -1025,3 +1025,34 @@
 2026-04-07 17:00:25: ================================================================================
 2026-04-07 17:00:25: SUCCESS: Analysis completed successfully
 2026-04-07 17:00:25: ================================================================================
+2026-05-06 19:58:43: ================================================================================
+2026-05-06 19:58:43: Katana Analyzer Script
+2026-05-06 19:58:43: ================================================================================
+2026-05-06 19:58:43: Scene path: src/samples/test_scene.katana
+2026-05-06 19:58:43: Output directory: ./renderfarm
+2026-05-06 19:58:43: ================================================================================
+2026-05-06 19:58:43: [INFO] Collecting dependencies from Katana file...
+2026-05-06 19:58:43: [INFO] Found 0 unique dependencies.
+2026-05-06 19:58:43: [INFO] Extracting AOVs...
+2026-05-06 19:58:43: [INFO] Found 4 AOVs
+2026-05-06 19:58:43: [INFO] Extracting render settings...
+2026-05-06 19:58:43: [INFO] Render settings extracted
+2026-05-06 19:58:43: [SUCCESS] Dependency list saved to: ./renderfarm/katana_file_list.txt
+2026-05-06 19:58:43: [ERROR] Failed to save web UI data: [Errno 13] Permission denied: './renderfarm/web_ui_data.json'
+2026-05-06 19:59:51: ================================================================================
+2026-05-06 19:59:51: Katana Analyzer Script
+2026-05-06 19:59:51: ================================================================================
+2026-05-06 19:59:51: Scene path: src/samples/test_scene.katana
+2026-05-06 19:59:51: Output directory: ./renderfarm
+2026-05-06 19:59:51: ================================================================================
+2026-05-06 19:59:51: [INFO] Collecting dependencies from Katana file...
+2026-05-06 19:59:51: [INFO] Found 0 unique dependencies.
+2026-05-06 19:59:51: [INFO] Extracting AOVs...
+2026-05-06 19:59:51: [INFO] Found 4 AOVs
+2026-05-06 19:59:51: [INFO] Extracting render settings...
+2026-05-06 19:59:51: [INFO] Render settings extracted
+2026-05-06 19:59:51: [SUCCESS] Dependency list saved to: ./renderfarm/katana_file_list.txt
+2026-05-06 19:59:51: [SUCCESS] Web UI data saved to: ./renderfarm/web_ui_data.json
+2026-05-06 19:59:51: ================================================================================
+2026-05-06 19:59:51: [SUCCESS] Katana analysis completed successfully
+2026-05-06 19:59:51: ================================================================================
