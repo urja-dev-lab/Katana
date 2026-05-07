@@ -32,7 +32,7 @@ echo "Running Katana analysis..."
 echo "Input file: $INPUT_KANA"
 echo "Output directory: $OUTPUT_DIR"
 
-katana --script src/analyze/analyze_katana.py -- "$INPUT_KANA" "$OUTPUT_DIR"
+katana --script analyze_katana.py -- "$INPUT_KANA" "$OUTPUT_DIR"
 
 # Check exit status
 if [ $? -eq 0 ]; then

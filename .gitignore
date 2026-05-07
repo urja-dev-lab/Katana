@@ -1,0 +1,11 @@
+# Ignore output files from Katana integration scripts
+create_log.txt
+katana_file_list.txt
+web_ui_data.json
+repath_log.txt
+repath_report.json
+maya_file_list.txt
+
+# Ignore Python cache directories
+__pycache__/
+*.pyc

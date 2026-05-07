@@ -1,54 +1,38 @@
-# Katana Integrations Agent Guide
+# Katana Integration Agent Guide
 
-## Environment
+## Critical Requirements
 - Scripts MUST run in Katana environment: `katana --script <script.py> <args>`
 - Outside Katana, Katana-specific imports (NodegraphAPI, KatanaFile, AssetAPI) will fail
-- Use the helper script for Linux: `./run_katana_analysis.sh input.katana output_dir`
+- Helper script (Linux): `./run_katana_analysis.sh input.katana output_dir`
 
-## Commands
+## Core Commands
 ### Analysis
 ```bash
-katana --script src/analyze/analyze_katana.py -- input.katana output_dir
-```
-Or using the helper script (Linux):
-```bash
-./run_katana_analysis.sh input.katana output_dir
+katana --script analyze_katana.py -- input.katana output_dir
 ```
 Outputs:
-- `output_dir/create_log.txt` - Process log
-- `output_dir/katana_file_list.txt` - CSV: source_path,target_path
-- `output_dir/web_ui_data.json` - AOVs, assets, render settings
+- `create_log.txt` - Process log (all operations, missing assets individually)
+- `katana_file_list.txt` - CSV: source_path,target_path (only existing sources)
+- `web_ui_data.json` - AOVs, assets (sequence patterns only), render settings
 
-### Repath
-Auto-generate mapping:
+### Repath (mapping file IS REQUIRED)
 ```bash
-katana --script src/repath/repath_katana.py -- input.katana output.katana
+katana --script repath_katana.py -- input.katana output.katana mapping.json
 ```
+(mapping.json must be web_ui_data.json from analysis)
 
-With existing mapping:
-```bash
-katana --script src/repath/repath_katana.py -- input.katana output.katana mapping.csv
-```
-
-## Key Behaviors
+## Key Behaviors (Non-obvious)
 - Asset hashes: SHA-256, first 32 chars (matches Maya integration)
-- Path normalization: Internal forward slashes, Windows output uses backslashes in target paths
-- File sequences: Automatically detected and expanded
-- Missing AOV/render settings: Defaults to RGBA/Z AOVs, Arnold 1920x1080 1-100x1
-- Logging: Scripts log to console and create_log.txt (analysis only)
+- Path normalization: Internal forward slashes, Windows output uses backslashes
+- File sequences: Automatically detected (UDIM supported)
+- web_ui_data.json contains sequence patterns (e.g., COL_<UDIM>.tx), NOT expanded frames
+- Logging: All missing assets listed individually in create_log.txt (no summaries)
 
-## Testing
-- Test scene: `src/samples/test_scene.katana`
-- Batch test: `./run_katana_analysis.sh src/samples/test_scene.katana ./renderfarm`
-- Outputs appear in specified output directory (not hardcoded to renderfarm/)
-
-## Dependencies
-- Foundry Katana Python API (bundled with Katana)
-- Python standard library only
-- No external pip packages required
+## Testing Procedure
+1. Analysis: `./run_katana_analysis.sh /srv/local/Dev/SQN/Samples/Katana_Sample_Project/Bus_v002.katana ./output`
+2. Repath: `katana --script repath_katana.py -- /srv/local/Dev/SQN/Samples/Katana_Sample_Project/Bus_v002.katana ./output/output.katana ./output/web_ui_data.json`
 
 ## Troubleshooting
 - "Katana modules not available" = Not running in Katana environment
-- Path mapping issues = Check forward/backward slash handling (target paths use backslashes)
+- Path mapping issues = Check forward/backslash handling (target paths use backslashes)
 - Missing dependencies = Verify file parameters contain valid paths
-- Script arguments: The helper script expects exactly 2 arguments (input.katana output_dir)
