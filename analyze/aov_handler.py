@@ -1,3 +1,5 @@
+from common.logger import KatanaLogger
+
 try:
     import NodegraphAPI
     from Katana import KatanaFile, AssetAPI
@@ -7,11 +9,17 @@ except ImportError:
     KatanaFile = None
     AssetAPI = None
 
-def get_aovs_from_render_nodes():
+
+def get_aovs_from_render_nodes(logger=None):
     """Extract AOV information from render nodes"""
+    # Create logger if not provided
+    if logger is None:
+        logger = KatanaLogger()
+    
     aovs = []
     try:
         if not NodegraphAPI:
+            logger.warning("Katana modules not available, using default AOVs")
             return [{'name': 'RGBA', 'type': 6}, {'name': 'Z', 'type': 4}]
             
         # Get all render nodes (typically Render node type)
@@ -50,10 +58,11 @@ def get_aovs_from_render_nodes():
                                     'type': 6  # Default type for color AOVs
                                 })
     except Exception as e:
-        print(f"[WARNING] Could not extract AOVs: {e}")
+        logger.warning(f"Could not extract AOVs: {e}")
     
     # If no AOVs found, provide some defaults based on common Katana setups
     if not aovs:
+        logger.info("No AOVs found, using default AOVs")
         aovs = [
             {'name': 'RGBA', 'type': 6},
             {'name': 'Z', 'type': 4},

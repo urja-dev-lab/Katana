@@ -5,7 +5,9 @@ web_ui_data.json
 repath_log.txt
 repath_report.json
 maya_file_list.txt
+repath_log.txt
 
 # Ignore Python cache directories
 __pycache__/
 *.pyc
+*.katana

@@ -1,3 +1,5 @@
+from common.logger import KatanaLogger
+
 try:
     import NodegraphAPI
     from Katana import KatanaFile, AssetAPI
@@ -6,22 +8,18 @@ except ImportError:
     NodegraphAPI = None
     KatanaFile = None
     AssetAPI = None
-
     
-def get_render_settings():
+    
+def get_render_settings(logger=None):
     """Extract render settings from render nodes"""
+    # Create logger if not provided
+    if logger is None:
+        logger = KatanaLogger()
+    
     settings = {}
     try:
         if not NodegraphAPI:
-            # Provide defaults
-            return {
-                'renderer': 'arnold',
-                'resolution_width': 1920,
-                'resolution_height': 1080,
-                'frame_start': 1,
-                'frame_end': 100,
-                'frame_step': 1
-            }
+            logger.warning("Katana modules not available, using default render settings")
             
         all_nodes = NodegraphAPI.GetAllNodes()
         for node in all_nodes:
@@ -36,16 +34,8 @@ def get_render_settings():
                     settings['frame_end'] = render_params.getChildByName('frameEnd').getValue(0) if render_params.getChildByName('frameEnd') else 100
                     settings['frame_step'] = render_params.getChildByName('frameStep').getValue(0) if render_params.getChildByName('frameStep') else 1
                     break
+        logger.info("Render settings extracted successfully")
     except Exception as e:
-        print(f"[WARNING] Could not extract render settings: {e}")
-        # Provide defaults
-        settings = {
-            'renderer': 'arnold',
-            'resolution_width': 1920,
-            'resolution_height': 1080,
-            'frame_start': 1,
-            'frame_end': 100,
-            'frame_step': 1
-        }
+        logger.warning(f"Could not extract render settings: {e}")
     
     return settings
