@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "enabled": false,
+  "validation": "untested",
+  "isUserCustom": false,
+  "template": {
+    "id": 40,
+    "symbol": "TEMPLATE_ID_KATANA",
+    "folder": "katana"
+  },
+  "requiresDcc": true,
+  "outputs": {
+    "webUiData": "renderfarm/web_ui_data.json",
+    "analysisLog": "renderfarm/analysis_log.txt",
+    "fileList": "renderfarm/katana_file_list.txt",
+    "status": "renderfarm/status.json",
+    "repathLog": "renderfarm/repath_log.txt",
+    "repathReport": "renderfarm/repath_report.json"
+  },
+  "tools": {
+    "analyze": {
+      "mode": "dcc_python",
+      "wrapper": "katana_scene_tool.py",
+      "executable": {
+        "source": "appProfileInstallPath",
+        "relativeTool": {
+          "windows": "bin/katanaBin.exe",
+          "linux": "katana",
+          "macos": "katana"
+        }
+      },
+      "command": "\"{tool}\" --batch --script \"{wrapper}\" -- --request \"{requestJson}\""
+    },
+    "repath": {
+      "mode": "none",
+      "wrapper": "katana_scene_tool.py",
+      "executable": {
+        "source": "appProfileInstallPath",
+        "relativeTool": {
+          "windows": "bin/katanaBin.exe",
+          "linux": "katana",
+          "macos": "katana"
+        }
+      },
+      "command": "\"{tool}\" --batch --script \"{wrapper}\" -- --request \"{requestJson}\""
+    }
+  }
+}

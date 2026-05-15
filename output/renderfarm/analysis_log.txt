@@ -1,0 +1,94 @@
+2026-05-14 20:39:10: [INFO] ================================================================================
+2026-05-14 20:39:10: [INFO] Katana Analyzer Script
+2026-05-14 20:39:10: [INFO] ================================================================================
+2026-05-14 20:39:10: [INFO] Scene path: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/Bus_v002.katana
+2026-05-14 20:39:10: [INFO] Output directory: /srv/local/Dev/GIT/Katana/Katana/output
+2026-05-14 20:39:10: [INFO] ================================================================================
+2026-05-14 20:39:10: [INFO] ================================================================================
+2026-05-14 20:39:10: [INFO] [INFO] Collecting dependencies from Katana file...
+2026-05-14 20:39:11: [INFO] Katana file loaded successfully
+2026-05-14 20:39:11: [INFO] Found 588 nodes to process
+2026-05-14 20:39:12: [INFO] Dependency collection completed. Processed 72 file parameters.
+2026-05-14 20:39:12: [INFO] [INFO] Found 73 unique dependencies.
+2026-05-14 20:39:12: [INFO] [INFO] Extracting AOVs...
+2026-05-14 20:39:12: [INFO] [INFO] Found 4 AOVs
+2026-05-14 20:39:12: [INFO] [INFO] Extracting render settings...
+2026-05-14 20:39:12: [INFO] [INFO] Render settings extracted successfully
+2026-05-14 20:39:12: [SUCCESS] Web UI data saved to: /srv/local/Dev/GIT/Katana/Katana/output/renderfarm/web_ui_data.json
+2026-05-14 20:39:12: [INFO] Excluded 12 assets from web_ui_data.json due to missing source files
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: Y:/studio/projects/awmw/assets/Double_Decker_Bus_01/TXT/publish/caches/Double_Decker_Bus_v01.abc - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /Shares/Y/studio/projects/ - Source file does not exist
+2026-05-14 20:39:12: [SUCCESS] Dependency list saved to: /srv/local/Dev/GIT/Katana/Katana/output/renderfarm/katana_file_list.txt
+2026-05-14 20:39:12: [INFO] Skipped 12 dependencies due to missing source files
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: //v001/_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /Shares/Y/studio/projects/ - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:39:12: [WARNING] Missing asset: Y:/studio/projects/awmw/assets/Double_Decker_Bus_01/TXT/publish/caches/Double_Decker_Bus_v01.abc - Source file does not exist
+2026-05-14 20:39:12: [INFO] ================================================================================
+2026-05-14 20:39:12: [INFO] [SUCCESS] Katana analysis completed successfully
+2026-05-14 20:39:12: [INFO] ================================================================================
+2026-05-14 20:43:52: [INFO] ================================================================================
+2026-05-14 20:43:52: [INFO] Katana Analyzer Script
+2026-05-14 20:43:52: [INFO] ================================================================================
+2026-05-14 20:43:52: [INFO] Scene path: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/Bus_v002.katana
+2026-05-14 20:43:52: [INFO] Output directory: /srv/local/Dev/GIT/Katana/Katana/output
+2026-05-14 20:43:52: [INFO] ================================================================================
+2026-05-14 20:43:52: [INFO] ================================================================================
+2026-05-14 20:43:52: [INFO] [INFO] Collecting dependencies from Katana file...
+2026-05-14 20:43:53: [INFO] Katana file loaded successfully
+2026-05-14 20:43:53: [INFO] Found 588 nodes to process
+2026-05-14 20:43:53: [INFO] Dependency collection completed. Processed 72 file parameters.
+2026-05-14 20:43:53: [INFO] [INFO] Found 74 unique dependencies.
+2026-05-14 20:43:53: [INFO] [INFO] Extracting AOVs...
+2026-05-14 20:43:53: [INFO] [INFO] Found 4 AOVs
+2026-05-14 20:43:53: [INFO] [INFO] Extracting render settings...
+2026-05-14 20:43:53: [INFO] [INFO] Render settings extracted successfully
+2026-05-14 20:43:53: [SUCCESS] Web UI data saved to: /srv/local/Dev/GIT/Katana/Katana/output/renderfarm/web_ui_data.json
+2026-05-14 20:43:53: [INFO] Excluded 12 assets from web_ui_data.json due to missing source files
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: Y:/studio/projects/awmw/assets/Double_Decker_Bus_01/TXT/publish/caches/Double_Decker_Bus_v01.abc - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /Shares/Y/studio/projects/ - Source file does not exist
+2026-05-14 20:43:53: [SUCCESS] Dependency list saved to: /srv/local/Dev/GIT/Katana/Katana/output/renderfarm/katana_file_list.txt
+2026-05-14 20:43:53: [INFO] Skipped 12 dependencies due to missing source files
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: //v001/_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /Shares/Y/studio/projects/ - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_BTY_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMA_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMM_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_CMO_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: /srv/local/Dev/SQN/Samples/Katana_Sample_Project/out//Double_Decker_Bus/v001/Double_Decker_Bus_DAT_v001_0.exr - Source file does not exist
+2026-05-14 20:43:53: [WARNING] Missing asset: Y:/studio/projects/awmw/assets/Double_Decker_Bus_01/TXT/publish/caches/Double_Decker_Bus_v01.abc - Source file does not exist
+2026-05-14 20:43:53: [INFO] ================================================================================
+2026-05-14 20:43:53: [INFO] [SUCCESS] Katana analysis completed successfully
+2026-05-14 20:43:53: [INFO] ================================================================================

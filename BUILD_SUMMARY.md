@@ -23,7 +23,7 @@ Client-side analysis script that:
 - Logs analysis process to create_log.txt
 - Collects all dependencies using utility functions
 - Generates katana_file_list.txt (CSV: source_path,target_path)
-- Generates web_ui_data.json (JSON with AOVs, assets, render settings)
+- Generates web_ui_data.json (JSON with AOVs, assets, render settings, and render node names)
 - Exits with appropriate status codes
 
 ### 3. repath_katana.py
@@ -61,7 +61,7 @@ python repath_katana.py input.katana output.katana mapping.csv
 After running the analysis script, the output directory will contain:
 - create_log.txt: Detailed log of the analysis process
 - katana_file_list.txt: CSV listing of source files and their target hash paths
-- web_ui_data.json: JSON containing AOVs, assets, and render settings
+- web_ui_data.json: JSON containing AOVs, assets, render settings, and render node names
 
 ## Dependencies
 - Foundry Katana Python API (NodegraphAPI, KatanaFile, AssetAPI)
@@ -77,8 +77,34 @@ After running the analysis script, the output directory will contain:
 The scripts have been syntax-checked and are ready for deployment in a Katana environment.
 Actual testing requires a Katana installation with sample files containing texture dependencies.
 
+## Recent Enhancements
+
+### Render Node Name Extraction
+- **NEW FEATURE**: Added render node name extraction to web_ui_data.json
+- This enhancement allows the system to include render node names for render farm submission
+- The web_ui_data.json now includes a "render_nodes" array with the names of all render nodes found in the scene
+
+### Progress Summary
+
+#### Completed Features
+- Core analysis functionality working
+- Path remapping functionality working
+- File sequence detection (UDIM and frame sequences) working
+- Asset hashing using SHA-256 (first 32 characters) working
+- AOV extraction from render nodes working
+- Render settings extraction from render nodes working
+- **NEW**: Render node name extraction now included in web_ui_data.json
+
+#### Pending Fixes
+- Syntax errors in analyze_katana.py (lines ~140+ have extra except statements)
+- Need to clean up duplicate code in extract_render_settings function
+- Test and validate the updated render node extraction functionality
+
 ## Next Steps
 1. Deploy to render farm environment
 2. Test with actual Katana files containing texture dependencies
 3. Verify output file formats match expectations
 4. Integrate with render farm job submission system
+5. Fix syntax errors in analyze_katana.py
+6. Clean up duplicate code in extract_render_settings function
+7. Validate updated render node extraction functionality

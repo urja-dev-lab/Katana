@@ -25,7 +25,9 @@ def collect_all_dependencies(input_file, logger=None):
     file_mapping = {}     # Mapping of source -> target
     assets_data = []      # For web_ui_data.json
     added_sources = set()  # Track sources we've already added to assets_data to avoid duplicates
-    
+    normalized_input = input_file.replace('\\', '/')
+    project_path = os.path.dirname(normalized_input)
+
     if not NodegraphAPI or not KatanaFile:
         logger.error("Katana modules not available")
         return dependencies, file_mapping, assets_data
@@ -37,6 +39,21 @@ def collect_all_dependencies(input_file, logger=None):
     except Exception as e:
         logger.error(f"Failed to load Katana file: {e}")
         return dependencies, file_mapping, assets_data
+    
+    # Added scene file to dependencies and mapping
+    
+    dependencies.add(normalized_input)
+    base_name = os.path.basename(normalized_input)
+    target_path = (normalized_input.replace(f"{project_path}/", "")).replace(f"{base_name}", "")
+    file_mapping[normalized_input] = target_path
+    assets_data.append({
+        'metadata': {
+            'node_type': 'scene_file'
+        },
+        'node': 'Scene',
+        'source': normalized_input,
+        'target': target_path
+    })
     
     # Traverse all nodes to find dependencies
     all_nodes = NodegraphAPI.GetAllNodes()
@@ -94,7 +111,12 @@ def collect_all_dependencies(input_file, logger=None):
                                         asset_hash = generate_asset_hash(normalized_path)
                                         # Determine file extension for target
                                         _, ext = os.path.splitext(normalized_path)
-                                        target_path = f"assets\\file\\{asset_hash}\\{os.path.basename(normalized_path)}"
+                                        # target_path = f"assets\\file\\{asset_hash}\\{os.path.basename(normalized_path)}"
+                                        project_path = os.path.dirname(input_file)
+                                        base_name = os.path.basename(normalized_path)
+                                        target_path = (normalized_path.replace(f"{project_path}/", "")).replace(base_name, "")
+                                        if target_path.endswith("/"):
+                                            target_path = target_path[:-1]
                                         
                                         # Store mapping
                                         file_mapping[normalized_path] = target_path
@@ -110,7 +132,9 @@ def collect_all_dependencies(input_file, logger=None):
                                         # Generate target hash for the original sequence pattern
                                         asset_hash = generate_asset_hash(normalized_original)
                                         _, ext = os.path.splitext(normalized_original)
-                                        target_path = f"assets\\file\\{asset_hash}\\{os.path.basename(normalized_original)}"
+                                        # target_path = f"assets\\file\\{asset_hash}\\{os.path.basename(normalized_original)}"
+                                        project_path = os.path.dirname(input_file)
+                                        target_path = normalized_original.replace(f"{project_path}/", "")
                                         
                                         assets_data.append({
                                             'metadata': {

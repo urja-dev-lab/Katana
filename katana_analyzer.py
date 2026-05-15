@@ -28,16 +28,16 @@ if script_dir not in sys.path:
     print(f"sys.path updated to include script directory {script_dir}")
 
 # Import logger from common
-common_path = os.path.join(script_dir, 'common')
-if common_path not in sys.path:
-    sys.path.insert(0, common_path)
-    print(f"sys.path updated to include common directory {common_path}")
+# common_path = os.path.join(script_dir, 'common')
+# if common_path not in sys.path:
+#     sys.path.insert(0, common_path)
+#     print(f"sys.path updated to include common directory {common_path}")
 
 # Import from analyze directory
-analyze_path = os.path.join(script_dir, 'analyze')
-if analyze_path not in sys.path:
-    sys.path.insert(0, analyze_path)
-    print(f"sys.path updated to include analyze directory {analyze_path}")
+# analyze_path = os.path.join(script_dir, 'analyze')
+# if analyze_path not in sys.path:
+#     sys.path.insert(0, analyze_path)
+#     print(f"sys.path updated to include analyze directory {analyze_path}")
 
 from common.logger import KatanaLogger
 from analyze.dependency_handler import collect_all_dependencies
@@ -57,11 +57,12 @@ class KatanaAnalyzer:
         self.assets_data = []
         self.aovs = []
         self.render_settings = {}
+        self.render_node_names = []
         
     def setup_logging(self):
         """Setup logging to both console and file"""
-        log_file = os.path.join(self.output_directory, 'create_log.txt')
-        self.logger = KatanaLogger(log_file)
+        self.log_file = os.path.join(self.output_directory, 'renderfarm/analysis_log.txt')
+        self.logger = KatanaLogger(self.log_file)
         return self.logger.log
     
     def validate_input_file(self):
@@ -72,11 +73,17 @@ class KatanaAnalyzer:
     def ensure_output_directory(self):
         """Ensure output directory exists"""
         os.makedirs(self.output_directory, exist_ok=True)
-    
+        os.makedirs(os.path.join(self.output_directory, 'renderfarm'), exist_ok=True)
     def collect_dependencies_and_mapping(self, logger):
         """Collect dependencies and generate file mapping"""
         logger.info("[INFO] Collecting dependencies from Katana file...")
         self.dependencies, self.file_mapping, self.assets_data = collect_all_dependencies(self.input_katana, logger)
+        
+        # Ensure log file is included in dependencies for tracking
+        normalized_log_path = self.log_file.replace('\\', '/')
+        self.dependencies.add(normalized_log_path)
+        self.file_mapping[normalized_log_path] = "renderfarm"
+
         logger.info(f"[INFO] Found {len(self.dependencies)} unique dependencies.")
         return self.dependencies, self.file_mapping, self.assets_data
     
@@ -84,59 +91,49 @@ class KatanaAnalyzer:
         """Extract AOVs from render nodes"""
         logger.info("[INFO] Extracting AOVs...")
         try:
-            self.aovs = get_aovs_from_render_nodes()
+            self.aovs, self.render_node_names = get_aovs_from_render_nodes()
             logger.info(f"[INFO] Found {len(self.aovs)} AOVs")
+            if self.render_node_names:
+                logger.info(f"[INFO] Found render nodes: {', '.join(self.render_node_names)}")
             return self.aovs
         except Exception as e:
             logger.warning(f"[WARNING] Could not extract AOVs: {e}")
             logger.info("[INFO] Using default AOVs: RGBA, Z")
             self.aovs = [{'name': 'RGBA', 'type': 6}, {'name': 'Z', 'type': 4}]
+            self.render_node_names = []
             return self.aovs
     
     def extract_render_settings(self, logger):
-            """Extract render settings from render nodes"""
-            logger.info("[INFO] Extracting render settings...")
-            try:
-                self.render_settings = get_render_settings()
-                logger.info("[INFO] Render settings extracted")
-                return self.render_settings
-            except Exception as e:
-                logger.warning(f"[WARNING] Could not extract render settings: {e}")
-                logger.info("[INFO] Using default render settings: Arnold 1920x1080 1-100x1")
-                self.render_settings = {
-                    'renderer': 'arnold',
-                    'resolution_width': 1920,
-                    'resolution_height': 1080,
-                    'frame_start': 1,
-                    'frame_end': 100,
-                    'frame_step': 1
-                }
-                return self.render_settings
-            except Exception as e:
-                logger.warning(f"[WARNING] Could not extract render settings: {e}")
-                logger.info("[INFO] Using default render settings: Arnold 1920x1080 1-100x1")
-                self.render_settings = {
-                    'renderer': 'arnold',
-                    'resolution_width': 1920,
-                    'resolution_height': 1080,
-                    'frame_start': 1,
-                    'frame_end': 100,
-                    'frame_step': 1
-                }
-                return self.render_settings
-            except Exception as e:
-                self.logger.warning(f"[WARNING] Could not extract render settings: {e}")
-                self.logger.info("[INFO] Using default render settings: Arnold 1920x1080 1-100x1")
-                self.render_settings = {
-                    'renderer': 'arnold',
-                    'resolution_width': 1920,
-                    'resolution_height': 1080,
-                    'frame_start': 1,
-                    'frame_end': 100,
-                    'frame_step': 1
-                }
-                return self.render_settings
-
+        """Extract render settings from render nodes"""
+        logger.info("[INFO] Extracting render settings...")
+        try:
+            # New format: get_render_settings() returns a dict keyed by render node name
+            self.render_nodes_data = get_render_settings()
+            
+            # Extract render node names for backward compatibility with AOV handling
+            # self.render_node_names_from_settings = list(self.render_nodes_data.keys())
+            
+            # For backward compatibility, keep render_settings as settings from first node (if any)
+            # But note: this is now less meaningful since we have per-node settings
+            if self.render_nodes_data:
+                first_node_name = next(iter(self.render_nodes_data))
+                self.render_settings = self.render_nodes_data[first_node_name]["render_settings"]
+            else:
+                self.render_settings = {}
+                
+            logger.info("[INFO] Render settings extracted successfully")
+            # logger.info(f"[INFO] Found render nodes: {', '.join(self.render_node_names_from_settings)}")
+            
+            # Note: AOV extraction happens separately in extract_aovs()
+            # The render_node_names will be set there or merged later
+            return self.render_settings
+        except Exception as e:
+            logger.warning(f"[WARNING] X Could not extract render settings: {e}")
+            logger.info("[INFO] Using empty render settings")
+            self.render_nodes_data = {}
+            self.render_settings = {}
+            return self.render_settings
+        
     def is_sequence_source_valid(self, source_path):
         """Check if a sequence source path has any existing files"""
         from analyze.file_sequence_validator import is_sequence_source_valid
@@ -144,7 +141,13 @@ class KatanaAnalyzer:
 
     def save_dependency_list(self, log_message):
         """Save dependencies to katana_file_list.txt - only if source path exists"""
-        file_list_path = os.path.join(self.output_directory, 'katana_file_list.txt')
+        file_list_path = os.path.join(self.output_directory, 'renderfarm/katana_file_list.txt')
+
+        # Ensure the output file itself is included in dependencies for tracking
+        normalized_log_path = file_list_path.replace('\\', '/')
+        self.dependencies.add(normalized_log_path)
+        self.file_mapping[normalized_log_path] = "renderfarm"
+
         missing_assets = []
         try:
             with open(file_list_path, 'w') as f:
@@ -173,7 +176,13 @@ class KatanaAnalyzer:
     
     def save_web_ui_data(self, log_message):
         """Save web UI data to web_ui_data.json - only include assets where source path exists"""
-        web_ui_path = os.path.join(self.output_directory, 'web_ui_data.json')
+        web_ui_path = os.path.join(self.output_directory, 'renderfarm/web_ui_data.json')
+        
+        # Ensure the output file itself is included in dependencies for tracking
+        normalized_log_path = web_ui_path.replace('\\', '/')
+        self.dependencies.add(normalized_log_path)
+        self.file_mapping[normalized_log_path] = "renderfarm"
+
         missing_assets = []
         try:
             # Filter assets to only include those where source path exists
@@ -207,7 +216,8 @@ class KatanaAnalyzer:
             web_ui_data = {
                 "aovs": self.aovs,
                 "assets": valid_assets,
-                "render_settings": self.render_settings
+                "render_settings": self.render_settings,
+                "render_nodes": self.render_nodes_data
             }
             
             with open(web_ui_path, 'w') as f:
@@ -233,18 +243,6 @@ class KatanaAnalyzer:
             logger.info("================================================================================")
             logger.info("================================================================================")
         
-    def log_script_footer(self, logger):
-        """Log script footer information"""
-        logger.info("================================================================================")
-        logger.info("[SUCCESS] Katana analysis completed successfully")
-        logger.info("================================================================================")
-    
-    def log_script_footer(self, logger):
-        """Log script footer information"""
-        logger.info("================================================================================")
-        logger.info("[SUCCESS] Katana analysis completed successfully")
-        logger.info("================================================================================")
-    
     def run(self):
         """Main execution method"""
         try:
@@ -270,8 +268,9 @@ class KatanaAnalyzer:
             self.extract_render_settings(self.logger)
             
             # Save outputs and get missing assets
-            missing_from_list = self.save_dependency_list(log_message)
             missing_from_webui = self.save_web_ui_data(log_message)
+            missing_from_list = self.save_dependency_list(log_message)
+            
             
             # Log footer
             self.log_script_footer(self.logger)
@@ -287,6 +286,12 @@ class KatanaAnalyzer:
             traceback.print_exc()
             sys.exit(1)
 
+    def log_script_footer(self, logger):
+        """Log script footer information"""
+        logger.info("================================================================================")
+        logger.info("[SUCCESS] Katana analysis completed successfully")
+        logger.info("================================================================================")
+    
 
 def main():
     """Main entry point"""
