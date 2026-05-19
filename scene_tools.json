@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "enabled": false,
-  "validation": "untested",
+  "enabled": true,
+  "validation": "verified",
   "isUserCustom": false,
   "template": {
     "id": 40,
@@ -12,7 +12,7 @@
   "outputs": {
     "webUiData": "renderfarm/web_ui_data.json",
     "analysisLog": "renderfarm/analysis_log.txt",
-    "fileList": "renderfarm/katana_file_list.txt",
+    "fileList": "renderfarm/file_list.txt",
     "status": "renderfarm/status.json",
     "repathLog": "renderfarm/repath_log.txt",
     "repathReport": "renderfarm/repath_report.json"
@@ -29,10 +29,10 @@
           "macos": "katana"
         }
       },
-      "command": "\"{tool}\" --batch --script \"{wrapper}\" -- --request \"{requestJson}\""
+      "command": "\"{tool}\" --script \"{wrapper}\" -- --request \"{requestJson}\""
     },
     "repath": {
-      "mode": "none",
+      "mode": "dcc_python",
       "wrapper": "katana_scene_tool.py",
       "executable": {
         "source": "appProfileInstallPath",
@@ -42,7 +42,7 @@
           "macos": "katana"
         }
       },
-      "command": "\"{tool}\" --batch --script \"{wrapper}\" -- --request \"{requestJson}\""
+      "command": "\"{tool}\" --script \"{wrapper}\" -- --request \"{requestJson}\""
     }
   }
 }

@@ -1,9 +1,8 @@
 """
 Katana scene tool wrapper.
 
-Common entry point for SquidNet scene operations. Mirrors the Maya/Blender
-wrappers: reads a request JSON describing the operation and the resolved
-paths, then dispatches to katana_analyzer or katana_repath.
+Common entry point for SquidNet scene operations:
+    katana --batch --script katana_scene_tool.py -- --request <request.json>
 """
 
 import json
@@ -12,16 +11,12 @@ import shutil
 import sys
 import traceback
 
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+try:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
-
-
-ANALYZER_FILE_LIST = "katana_file_list.txt"
-ANALYZER_MODULE = "katana_analyzer"
-REPATH_MODULE = "katana_repath"
-USE_DOUBLE_DASH = True
 
 
 def _wrapper_args():
@@ -33,16 +28,20 @@ def _wrapper_args():
 
 
 def _path(request, key, fallback=None):
-    return request.get("paths", {}).get(key) or fallback
+    """Look up a path key in request['paths'] then in request directly."""
+    return (
+        request.get("paths", {}).get(key)
+        or request.get(key)
+        or fallback
+    )
 
 
 def _write_status(request, state, exit_code, message, warnings=None, errors=None):
     status_path = _path(request, "statusPath")
     if not status_path:
         return
-
     os.makedirs(os.path.dirname(status_path), exist_ok=True)
-    with open(status_path, "w", encoding="utf-8") as status_file:
+    with open(status_path, "w", encoding="utf-8") as fh:
         json.dump(
             {
                 "schemaVersion": 1,
@@ -53,7 +52,7 @@ def _write_status(request, state, exit_code, message, warnings=None, errors=None
                 "warnings": warnings or [],
                 "errors": errors or [],
             },
-            status_file,
+            fh,
             indent=2,
         )
 
@@ -72,51 +71,55 @@ def _normalize_outputs(request):
     renderfarm_dir = _path(request, "renderfarmDir")
     if not renderfarm_dir:
         return
-
     _copy_if_needed(
-        os.path.join(renderfarm_dir, ANALYZER_FILE_LIST),
+        os.path.join(renderfarm_dir, "katana_file_list.txt"),
         _path(request, "fileListPath"),
     )
-
-
-def _build_analyzer_argv(request):
-    argv = [sys.argv[0]]
-    if USE_DOUBLE_DASH:
-        argv.append("--")
-    argv.extend(
-        [
-            _path(request, "scenePath") or "",
-            _path(request, "syncDir") or "",
-            _path(request, "profileJsonPath") or "",
-            _path(request, "syncDir") or "",
-        ]
+    _copy_if_needed(
+        os.path.join(renderfarm_dir, "analysis_log.txt"),
+        _path(request, "analysisLogPath"),
     )
-    return argv
 
 
 def _run_analyze(request):
-    import importlib
+    from katana_analyzer import main as analyze_main
 
-    analyzer = importlib.import_module(ANALYZER_MODULE)
-    sys.argv = _build_analyzer_argv(request)
-    try:
-        analyzer.main()
-    finally:
-        _normalize_outputs(request)
+    scene_path = _path(request, "scenePath")
+    if scene_path:
+        scene_path = os.path.realpath(scene_path)
+
+    sync_dir = _path(request, "syncDir")
+    profile_json = _path(request, "profileJsonPath")
+
+    analyze_main(scene_path, sync_dir, profile_json)
+    _normalize_outputs(request)
 
 
 def _run_repath(request):
-    import importlib
+    from katana_repath import main as repath_main
 
-    repath = importlib.import_module(REPATH_MODULE)
-    sys.argv = _build_analyzer_argv(request)
-    repath.main()
+    sync_dir = _path(request, "syncDir")
+    scene_rel_path = _path(request, "sceneRelPath")
+    web_ui_data_path = _path(request, "webUiDataPath")
+
+    missing = [
+        name for name, value in (
+            ("syncDir", sync_dir),
+            ("sceneRelPath", scene_rel_path),
+            ("webUiDataPath", web_ui_data_path),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError("Missing required Katana repath path(s): {}".format(", ".join(missing)))
+
+    repath_main(sync_dir, scene_rel_path, web_ui_data_path)
 
 
 def main():
     request_path = _wrapper_args()
-    with open(request_path, "r", encoding="utf-8") as request_file:
-        request = json.load(request_file)
+    with open(request_path, "r", encoding="utf-8") as fh:
+        request = json.load(fh)
 
     operation = request.get("operation")
     try:
@@ -129,11 +132,13 @@ def main():
 
         _write_status(request, "success", 0, "{} completed.".format(operation))
         return 0
+
     except SystemExit as exc:
         code = int(exc.code or 0)
         state = "success" if code == 0 else "failed"
         _write_status(request, state, code, "{} exited with code {}.".format(operation, code))
         return code
+
     except Exception as exc:
         _write_status(
             request,

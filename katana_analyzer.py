@@ -1,319 +1,440 @@
-#!/usr/bin/env python3
 """
-Katana Analysis Script
-Extracts dependencies from a Katana file and generates required output files for render farm integration.
+Katana Renderfarm Analyzer.
+
+Production entry point (via scene tool wrapper):
+    katana --batch --script katana_scene_tool.py -- --request <request.json>
+
+Direct invocation (development / testing):
+    katana --batch --script katana_analyzer.py -- <scene.katana> <sync_dir> <profile_json>
 """
 
-import os
 import json
+import os
 import sys
+import time
 import traceback
-from datetime import datetime
-from pathlib import Path
 
-# Get script directory using sys.argv[0] as fallback when __file__ is not available
 try:
-    script_path = sys.argv[0] if sys.argv and len(sys.argv) > 0 and not any('script' in arg for arg in sys.argv) else __file__
-    if script_path and os.path.exists(script_path):
-        script_dir = os.path.dirname(os.path.abspath(script_path))
-    else:
-        # Try to get directory from the first argument that looks like a file path
-        script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.path.dirname(os.path.abspath(sys.argv[0]))
-except (NameError, IndexError):
-    script_dir = os.getcwd()
+    from Katana import KatanaFile, NodegraphAPI
+except Exception:
+    KatanaFile = None
+    NodegraphAPI = None
 
-# Add the script's directory to Python path for imports
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
-    print(f"sys.path updated to include script directory {script_dir}")
+try:
+    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    CURRENT_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+LIBS_DIR = os.path.join(CURRENT_DIR, "libs")
+REPO_ROOT = os.path.dirname(CURRENT_DIR)
 
-# Import logger from common
-# common_path = os.path.join(script_dir, 'common')
-# if common_path not in sys.path:
-#     sys.path.insert(0, common_path)
-#     print(f"sys.path updated to include common directory {common_path}")
+for _p in (CURRENT_DIR, LIBS_DIR, REPO_ROOT):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-# Import from analyze directory
-# analyze_path = os.path.join(script_dir, 'analyze')
-# if analyze_path not in sys.path:
-#     sys.path.insert(0, analyze_path)
-#     print(f"sys.path updated to include analyze directory {analyze_path}")
+from libs.katana_logger import MessageLogger, get_logger          # noqa: E402
+from libs.katana_constants import (                               # noqa: E402
+    LOG_DIR, FILE_LIST, WEB_JSON_FILE, REPATH_LOG_FILE,
+)
+from libs.katana_data_handler import DataHandler                  # noqa: E402
+from libs.katana_scene_utils import get_project_root, resolve_asset_path  # noqa: E402
+from libs.katana_utils import (                                   # noqa: E402
+    normalize_path, normalize_join, is_probable_file_path,
+    is_udim_path, dedupe_dicts,
+)
+from libs.katana_info_collector import collect_scene_info         # noqa: E402
+from libs.katana_ui_fields import KatanaUIFields                  # noqa: E402
 
-from common.logger import KatanaLogger
-from analyze.dependency_handler import collect_all_dependencies
-from analyze.aov_handler import get_aovs_from_render_nodes
-from analyze.render_settings_handler import get_render_settings
+try:
+    from core.streamer_com import Messenger                       # noqa: E402
+except Exception:
+    Messenger = None
 
+
+# ---------------------------------------------------------------------------
+# Node / parameter traversal helpers
+# ---------------------------------------------------------------------------
+
+def _iter_nodes():
+    if NodegraphAPI is None:
+        return []
+    try:
+        fn = getattr(NodegraphAPI, "GetAllNodes", None)
+        if callable(fn):
+            return list(fn())
+    except Exception:
+        pass
+    root = getattr(NodegraphAPI, "GetRootNode", lambda: None)()
+    if root is None:
+        return []
+    nodes = []
+    def _walk(n):
+        nodes.append(n)
+        for c in (getattr(n, "getChildren", lambda: [])() or []):
+            _walk(c)
+    _walk(root)
+    return nodes
+
+
+def _node_name(node):
+    for attr in ("getName",):
+        fn = getattr(node, attr, None)
+        if callable(fn):
+            try:
+                return str(fn())
+            except Exception:
+                pass
+    return str(node)
+
+
+def _node_type(node):
+    fn = getattr(node, "getType", None)
+    if callable(fn):
+        try:
+            return str(fn())
+        except Exception:
+            pass
+    return ""
+
+
+def _param_value(param):
+    for frame in (0, 1):
+        try:
+            return param.getValue(frame)
+        except Exception:
+            pass
+    try:
+        return param.getValue()
+    except Exception:
+        return None
+
+
+def _param_full_name(param):
+    for attr in ("getFullName", "getName"):
+        fn = getattr(param, attr, None)
+        if callable(fn):
+            try:
+                return str(fn())
+            except Exception:
+                pass
+    return ""
+
+
+def _iter_params(param):
+    if param is None:
+        return
+    yield param
+    fn = getattr(param, "getChildren", None)
+    if callable(fn):
+        try:
+            children = fn() or []
+        except Exception:
+            children = []
+        for child in children:
+            for nested in _iter_params(child):
+                yield nested
+
+
+# ---------------------------------------------------------------------------
+# Asset collection
+# ---------------------------------------------------------------------------
+
+def _collect_assets(scene_path, project_root, dh, logger):
+    logger.add_header("COLLECTING ASSETS")
+    seen_paths = set()
+
+    for node in _iter_nodes():
+        nname = _node_name(node)
+        fn = getattr(node, "getParameters", None)
+        root_param = None
+        if callable(fn):
+            try:
+                root_param = fn()
+            except Exception:
+                pass
+
+        for param in _iter_params(root_param):
+            value = _param_value(param)
+            if not is_probable_file_path(value):
+                continue
+
+            param_path = _param_full_name(param)
+            resolved = resolve_asset_path(str(value), scene_path, project_root)
+            if not resolved or resolved in seen_paths:
+                continue
+            seen_paths.add(resolved)
+
+            if is_udim_path(resolved):
+                meta = {"asset_type": _asset_type(resolved), "is_udim": True}
+                dh.add_sequence_asset(resolved, nname, param_path, logger, meta)
+                logger.log("UDIM asset: {} [{}:{}]".format(resolved, nname, param_path))
+            else:
+                meta = {"asset_type": _asset_type(resolved)}
+                dh.add_path_and_asset(resolved, nname, param_path, meta)
+                logger.log("Asset: {} [{}:{}] exists={}".format(
+                    resolved, nname, param_path, os.path.exists(resolved)))
+
+    # Always include the scene file itself
+    scene_rel = os.path.relpath(os.path.dirname(scene_path), project_root)
+    dh.add_path(scene_path, scene_rel.replace("\\", "/"))
+
+    logger.log("Total assets collected: {}".format(len(dh.assets)))
+    logger.log("Total path entries: {}".format(len(dh.path_list)))
+
+
+def _asset_type(path):
+    from libs.katana_constants import (
+        CACHE_EXTENSIONS, GEOMETRY_EXTENSIONS, TEXTURE_EXTENSIONS,
+    )
+    ext = os.path.splitext(path or "")[1].lower()
+    if ext in TEXTURE_EXTENSIONS:
+        return "texture"
+    if ext in CACHE_EXTENSIONS:
+        return "cache"
+    if ext in GEOMETRY_EXTENSIONS:
+        return "geometry"
+    return "misc"
+
+
+# ---------------------------------------------------------------------------
+# Caches / bakes split
+# ---------------------------------------------------------------------------
+
+def _split_caches_bakes(assets, logger):
+    from libs.katana_constants import CACHE_EXTENSIONS, GEOMETRY_EXTENSIONS
+    caches, bakes = [], []
+    for a in assets:
+        src = a.get("source", "")
+        ext = os.path.splitext(src)[1].lower()
+        item = {
+            "path": src, "node": a.get("node", ""),
+            "exists": os.path.exists(src),
+            "source": a.get("source", ""),
+        }
+        if ext in CACHE_EXTENSIONS or ext in GEOMETRY_EXTENSIONS:
+            item["type"] = "cache" if ext in CACHE_EXTENSIONS else "geometry"
+            caches.append(item)
+        elif "bake" in src.lower() or "lightmap" in src.lower():
+            item["type"] = "texture"
+            bakes.append(item)
+    logger.log("Caches: {}  Bakes: {}".format(len(caches), len(bakes)))
+    return caches, bakes
+
+
+# ---------------------------------------------------------------------------
+# OCIO
+# ---------------------------------------------------------------------------
+
+def _collect_ocio(logger):
+    ocio_env = os.environ.get("OCIO", "")
+    data = {
+        "enabled": bool(ocio_env),
+        "custom": bool(ocio_env),
+        "path": normalize_path(ocio_env),
+        "valid": os.path.exists(ocio_env) if ocio_env else False,
+    }
+    logger.log("OCIO: {}".format(data))
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Main analyzer class
+# ---------------------------------------------------------------------------
 
 class KatanaAnalyzer:
-    """Main class for Katana file analysis"""
-    
-    def __init__(self, input_katana, output_directory):
-        self.input_katana = input_katana
-        self.output_directory = output_directory
-        self.logger = KatanaLogger()
-        self.dependencies = set()
-        self.file_mapping = {}
-        self.assets_data = []
-        self.aovs = []
-        self.render_settings = {}
-        self.render_node_names = []
-        
-    def setup_logging(self):
-        """Setup logging to both console and file"""
-        self.log_file = os.path.join(self.output_directory, 'renderfarm/analysis_log.txt')
-        self.logger = KatanaLogger(self.log_file)
-        return self.logger.log
-    
-    def validate_input_file(self):
-        """Validate that input file exists"""
-        if not os.path.exists(self.input_katana):
-            raise FileNotFoundError(f"Input file does not exist: {self.input_katana}")
-    
-    def ensure_output_directory(self):
-        """Ensure output directory exists"""
-        os.makedirs(self.output_directory, exist_ok=True)
-        os.makedirs(os.path.join(self.output_directory, 'renderfarm'), exist_ok=True)
-    def collect_dependencies_and_mapping(self, logger):
-        """Collect dependencies and generate file mapping"""
-        logger.info("[INFO] Collecting dependencies from Katana file...")
-        self.dependencies, self.file_mapping, self.assets_data = collect_all_dependencies(self.input_katana, logger)
-        
-        # Ensure log file is included in dependencies for tracking
-        normalized_log_path = self.log_file.replace('\\', '/')
-        self.dependencies.add(normalized_log_path)
-        self.file_mapping[normalized_log_path] = "renderfarm"
+    def __init__(self, scene_path, sync_dir, profile_json_path, logger, logger_path):
+        self.scene_path = normalize_path(scene_path)
+        self.sync_dir = normalize_path(sync_dir)
+        self.profile_json_path = profile_json_path
+        self.logger = logger
+        self.logger_path = logger_path
 
-        logger.info(f"[INFO] Found {len(self.dependencies)} unique dependencies.")
-        return self.dependencies, self.file_mapping, self.assets_data
-    
-    def extract_aovs(self, logger):
-        """Extract AOVs from render nodes"""
-        logger.info("[INFO] Extracting AOVs...")
-        try:
-            self.aovs, self.render_node_names = get_aovs_from_render_nodes()
-            logger.info(f"[INFO] Found {len(self.aovs)} AOVs")
-            if self.render_node_names:
-                logger.info(f"[INFO] Found render nodes: {', '.join(self.render_node_names)}")
-            return self.aovs
-        except Exception as e:
-            logger.warning(f"[WARNING] Could not extract AOVs: {e}")
-            logger.info("[INFO] Using default AOVs: RGBA, Z")
-            self.aovs = [{'name': 'RGBA', 'type': 6}, {'name': 'Z', 'type': 4}]
-            self.render_node_names = []
-            return self.aovs
-    
-    def extract_render_settings(self, logger):
-        """Extract render settings from render nodes"""
-        logger.info("[INFO] Extracting render settings...")
-        try:
-            # New format: get_render_settings() returns a dict keyed by render node name
-            self.render_nodes_data = get_render_settings()
-            
-            # Extract render node names for backward compatibility with AOV handling
-            # self.render_node_names_from_settings = list(self.render_nodes_data.keys())
-            
-            # For backward compatibility, keep render_settings as settings from first node (if any)
-            # But note: this is now less meaningful since we have per-node settings
-            if self.render_nodes_data:
-                first_node_name = next(iter(self.render_nodes_data))
-                self.render_settings = self.render_nodes_data[first_node_name]["render_settings"]
-            else:
-                self.render_settings = {}
-                
-            logger.info("[INFO] Render settings extracted successfully")
-            # logger.info(f"[INFO] Found render nodes: {', '.join(self.render_node_names_from_settings)}")
-            
-            # Note: AOV extraction happens separately in extract_aovs()
-            # The render_node_names will be set there or merged later
-            return self.render_settings
-        except Exception as e:
-            logger.warning(f"[WARNING] X Could not extract render settings: {e}")
-            logger.info("[INFO] Using empty render settings")
-            self.render_nodes_data = {}
-            self.render_settings = {}
-            return self.render_settings
-        
-    def is_sequence_source_valid(self, source_path):
-        """Check if a sequence source path has any existing files"""
-        from analyze.file_sequence_validator import is_sequence_source_valid
-        return is_sequence_source_valid(source_path)
+        self._profile_json = {}
+        if profile_json_path and os.path.exists(profile_json_path):
+            try:
+                with open(profile_json_path) as fh:
+                    self._profile_json = json.load(fh)
+            except Exception as exc:
+                logger.log("WARNING: Could not load profile JSON: {}".format(exc))
 
-    def save_dependency_list(self, log_message):
-        """Save dependencies to katana_file_list.txt - only if source path exists"""
-        file_list_path = os.path.join(self.output_directory, 'renderfarm/katana_file_list.txt')
+        self.project_root = get_project_root(scene_path)
+        self.dh = DataHandler(self.project_root)
 
-        # Ensure the output file itself is included in dependencies for tracking
-        normalized_log_path = file_list_path.replace('\\', '/')
-        self.dependencies.add(normalized_log_path)
-        self.file_mapping[normalized_log_path] = "renderfarm"
+        renderfarm_dir = os.path.join(sync_dir, LOG_DIR)
+        os.makedirs(renderfarm_dir, exist_ok=True)
 
-        missing_assets = []
-        try:
-            with open(file_list_path, 'w') as f:
-                for source_path in sorted(self.dependencies):
-                    # Only add paths where source actually exists
-                    if os.path.exists(source_path):
-                        target_path = self.file_mapping[source_path]
-                        f.write(f"{source_path},{target_path}\n")
-                    else:
-                        missing_assets.append({
-                            'source': source_path,
-                            'reason': 'Source file does not exist',
-                            'target': self.file_mapping.get(source_path, 'Unknown')
-                        })
-            
-            log_message(f"[SUCCESS] Dependency list saved to: {file_list_path}")
-            if missing_assets:
-                log_message(f"[INFO] Skipped {len(missing_assets)} dependencies due to missing source files")
-                for missing in missing_assets:  # Log all missing assets
-                    log_message(f"[WARNING] Missing asset: {missing['source']} - {missing['reason']}")
-        except Exception as e:
-            log_message(f"[ERROR] Failed to save dependency list: {e}")
-            raise
-        
-        return missing_assets
-    
-    def save_web_ui_data(self, log_message):
-        """Save web UI data to web_ui_data.json - only include assets where source path exists"""
-        web_ui_path = os.path.join(self.output_directory, 'renderfarm/web_ui_data.json')
-        
-        # Ensure the output file itself is included in dependencies for tracking
-        normalized_log_path = web_ui_path.replace('\\', '/')
-        self.dependencies.add(normalized_log_path)
-        self.file_mapping[normalized_log_path] = "renderfarm"
+        self.web_json_path = normalize_join(sync_dir, LOG_DIR, WEB_JSON_FILE)
+        self.file_list_path = normalize_join(sync_dir, LOG_DIR, FILE_LIST)
 
-        missing_assets = []
-        try:
-            # Filter assets to only include those where source path exists
-            # For sequences, check if any file in the sequence exists
-            valid_assets = []
-            for asset in self.assets_data:
-                source_path = asset.get('source', '')
-                if source_path:
-                    # Check if this is a sequence pattern
-                    if '<UDIM>' in source_path or any(pattern in source_path for pattern in ['.[0-9][0-9][0-9][0-9].', '.[0-9][0-9][0-9].', '.[0-9].']):
-                        # For sequences, check if any file in the sequence exists
-                        if self.is_sequence_source_valid(source_path):
-                            valid_assets.append(asset)
-                        else:
-                            missing_assets.append({
-                                'source': source_path,
-                                'reason': 'No files in sequence exist',
-                                'target': asset.get('target', 'Unknown')
-                            })
-                    else:
-                        # For regular files, check if the file exists
-                        if os.path.exists(source_path):
-                            valid_assets.append(asset)
-                        else:
-                            missing_assets.append({
-                                'source': source_path,
-                                'reason': 'Source file does not exist',
-                                'target': asset.get('target', 'Unknown')
-                            })
-            
-            web_ui_data = {
-                "aovs": self.aovs,
-                "assets": valid_assets,
-                "render_settings": self.render_settings,
-                "render_nodes": self.render_nodes_data
-            }
-            
-            with open(web_ui_path, 'w') as f:
-                json.dump(web_ui_data, f, indent=2)
-            log_message(f"[SUCCESS] Web UI data saved to: {web_ui_path}")
-            if missing_assets:
-                log_message(f"[INFO] Excluded {len(missing_assets)} assets from web_ui_data.json due to missing source files")
-                for missing in missing_assets:  # Log all missing assets
-                    log_message(f"[WARNING] Missing asset: {missing['source']} - {missing['reason']}")
-        except Exception as e:
-            log_message(f"[ERROR] Failed to save web UI data: {e}")
-            raise
-        
-        return missing_assets
-    
-    def log_script_header(self, logger):
-            """Log script header information"""
-            logger.info("================================================================================")
-            logger.info("Katana Analyzer Script")
-            logger.info("================================================================================")
-            logger.info(f"Scene path: {self.input_katana}")
-            logger.info(f"Output directory: {self.output_directory}")
-            logger.info("================================================================================")
-            logger.info("================================================================================")
-        
+        # Register renderfarm output files in the file list
+        self.dh.add_path(logger_path, LOG_DIR)
+        self.dh.add_path(self.web_json_path, LOG_DIR)
+        self.dh.add_path(self.file_list_path, LOG_DIR)
+
+        self.messenger = self._build_messenger()
+
+    def _build_messenger(self):
+        if Messenger is None:
+            return _NullMessenger()
+        m = Messenger()
+        m.request_type = "ANALYSIS_PROGRESS"
+        m.analysis_profile_key = self._profile_json.get("analysisProfileKey")
+        return m
+
     def run(self):
-        """Main execution method"""
+        self.logger.add_header("KATANA ANALYZER STARTED")
+        total_start = time.time()
+        stage_times = {}
+
+        def timed(name, fn):
+            t = time.time()
+            result = fn()
+            stage_times[name] = round(time.time() - t, 4)
+            return result
+
+        output_data = {}
         try:
-            # Validate input file
-            self.validate_input_file()
-            
-            # Ensure output directory exists
-            self.ensure_output_directory()
-            
-            # Setup logging
-            log_message = self.setup_logging()
-            
-            # Log header
-            self.log_script_header(self.logger)
-            
-            # Collect dependencies
-            self.collect_dependencies_and_mapping(self.logger)
-            
-            # Extract AOVs
-            self.extract_aovs(self.logger)
-            
-            # Extract render settings
-            self.extract_render_settings(self.logger)
-            
-            # Save outputs and get missing assets
-            missing_from_webui = self.save_web_ui_data(log_message)
-            missing_from_list = self.save_dependency_list(log_message)
-            
-            
-            # Log footer
-            self.log_script_footer(self.logger)
-            
-        except FileNotFoundError as e:
-            self.logger.error(f"[ERROR] {e}")
-            sys.exit(1)
-        except Exception as e:
-            self.logger.error(f"[ERROR] Unexpected error: {e}")
-            sys.exit(1)
-        except Exception as e:
-            print(f"[ERROR] Unexpected error: {e}")
-            traceback.print_exc()
-            sys.exit(1)
+            self.messenger.set_progress(5, "Initializing")
+            self.logger.log("Scene: {}".format(self.scene_path))
+            self.logger.log("Project root: {}".format(self.project_root))
+            self.logger.log("Sync dir: {}".format(self.sync_dir))
 
-    def log_script_footer(self, logger):
-        """Log script footer information"""
-        logger.info("================================================================================")
-        logger.info("[SUCCESS] Katana analysis completed successfully")
-        logger.info("================================================================================")
-    
+            # Load scene
+            self.messenger.set_progress(10, "Loading scene")
+            timed("load_scene", lambda: self._load_scene())
 
-def main():
-    """Main entry point"""
+            # Render settings / cameras / AOVs
+            self.messenger.set_progress(30, "Collecting render settings")
+            render_globals, aovs, cameras, render_nodes = timed(
+                "collect_scene_info",
+                lambda: collect_scene_info(self.logger),
+            )
+
+            # Assets
+            self.messenger.set_progress(45, "Collecting assets")
+            timed("collect_assets",
+                  lambda: _collect_assets(self.scene_path, self.project_root, self.dh, self.logger))
+
+            # OCIO / caches / bakes
+            self.messenger.set_progress(65, "Collecting OCIO / caches / bakes")
+            ocio_data = timed("collect_ocio", lambda: _collect_ocio(self.logger))
+            caches, bakes = timed("split_caches_bakes",
+                                  lambda: _split_caches_bakes(self.dh.assets, self.logger))
+
+            # Passes (output EXRs already captured in assets; surface them separately)
+            passes = [
+                {"name": a.get("node", ""), "path": a.get("source", ""), "type": "output"}
+                for a in self.dh.assets
+                if os.path.splitext(a.get("source", ""))[1].lower() == ".exr"
+                and "out" in a.get("source", "").lower()
+            ]
+
+            # UI fields
+            self.messenger.set_progress(85, "Generating web UI fields")
+            ui_fields_obj = KatanaUIFields(
+                self.scene_path, render_globals, cameras, render_nodes,
+            )
+
+            # Compose output
+            output_data = {
+                "dcc": "katana",
+                "scene_path": self.scene_path,
+                "scene_project_path": self.project_root,
+                "assets": self.dh.assets,
+                "render_globals": render_globals,
+                "renderer": render_globals.get("renderer", "unknown"),
+                "device_type": False,
+                "aovs": aovs,
+                "render_nodes": render_nodes,
+                "cameras": cameras,
+                "ocio": ocio_data,
+                "passes": passes,
+                "caches": caches,
+                "bakes": bakes,
+            }
+            output_data.update(ui_fields_obj.serialize())
+
+        except Exception as exc:
+            self.logger.log("ERROR in analyzer: {}".format(exc))
+            self.logger.log(traceback.format_exc())
+
+        finally:
+            output_data["analysis_metrics"] = {
+                "total_time": round(time.time() - total_start, 4),
+                "stage_times": stage_times,
+                "file_count": self.dh.file_count,
+                "dir_count": self.dh.dir_count,
+                "total_size_mb": round(self.dh.total_size_bytes / (1024 * 1024), 2),
+            }
+
+            timed("write_json", lambda: self._write_json(output_data))
+            timed("write_file_list", lambda: self.dh.write_file_list(self.file_list_path))
+
+            self.logger.log("Files collected: {}".format(self.dh.file_count))
+            self.logger.log("Total size MB: {:.2f}".format(
+                self.dh.total_size_bytes / (1024 * 1024)))
+
+            self.messenger.set_progress(100, "Analysis completed")
+            self.logger.add_header("KATANA ANALYZER COMPLETED SUCCESSFULLY")
+
+    def _load_scene(self):
+        if KatanaFile is None:
+            raise RuntimeError("Katana Python modules unavailable. Run inside Katana.")
+        self.logger.log("Loading: {}".format(self.scene_path))
+        try:
+            KatanaFile.Load(self.scene_path)
+        except TypeError:
+            KatanaFile.Load(self.scene_path, isCrashFile=False)
+        self.logger.log("Scene loaded successfully")
+
+    def _write_json(self, data):
+        try:
+            with open(self.web_json_path, "w") as fh:
+                json.dump(data, fh, indent=4, sort_keys=True, default=str)
+            self.logger.log("JSON written: {}".format(self.web_json_path))
+        except Exception as exc:
+            self.logger.log("ERROR writing JSON: {}".format(exc))
+
+
+# ---------------------------------------------------------------------------
+# Null messenger (fallback when core.streamer_com unavailable)
+# ---------------------------------------------------------------------------
+
+class _NullMessenger:
+    analysis_profile_key = None
+
+    def set_progress(self, pct, status):
+        print("Progress: {}% - {}".format(pct, status))
+
+
+# ---------------------------------------------------------------------------
+# Public main() — called by katana_scene_tool or directly
+# ---------------------------------------------------------------------------
+
+def main(scene_path, sync_dir, profile_json_path=None):
+    logger, logger_path = get_logger(scene_path, sync_dir)
     try:
-        # Validate arguments (account for -- separator from katana --script)
-        if len(sys.argv) < 4:
-            print("Usage: analyze_katana.py <input.katana> <output_directory>")
-            print("Usage: katana --script analyze_katana.py <input.katana> <output_directory>")
-            sys.exit(1)
-        
-        # Skip the -- separator that katana --script adds
-        input_katana = sys.argv[2]
-        output_directory = sys.argv[3]
-        
-        # Create analyzer instance and run
-        analyzer = KatanaAnalyzer(input_katana, output_directory)
+        analyzer = KatanaAnalyzer(
+            scene_path=scene_path,
+            sync_dir=sync_dir,
+            profile_json_path=profile_json_path,
+            logger=logger,
+            logger_path=logger_path,
+        )
         analyzer.run()
-        
-    except Exception as e:
-        print(f"[ERROR] Failed to initialize analyzer: {e}")
+        logger.add_header("SUCCESS")
+    except Exception as exc:
+        logger.log("FATAL: {}".format(exc))
+        logger.log(traceback.format_exc())
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    _args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
+    if len(_args) < 2:
+        print("Usage: katana --batch --script katana_analyzer.py -- <scene.katana> <sync_dir> [profile_json]")
+        sys.exit(1)
+    main(
+        scene_path=os.path.abspath(_args[0]),
+        sync_dir=os.path.abspath(_args[1]),
+        profile_json_path=_args[2] if len(_args) > 2 else None,
+    )

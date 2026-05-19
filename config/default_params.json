@@ -1,0 +1,10 @@
+{
+    "supported_versions": ["2020", "2021", "2022", "2023", "2024", "2025"],
+    "output_folder": "renderfarm",
+    "web_json": "web_ui_data.json",
+    "file_list": "katana_file_list.txt",
+    "log_file": "analysis_log.txt",
+    "headless": true,
+    "allow_dialogs": false,
+    "launcher": "Katana --batch --script"
+}
