@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "enabled": true,
   "validation": "verified",
-  "isUserCustom": false,
+  "isUserCustom": true,
   "template": {
     "id": 40,
     "symbol": "TEMPLATE_ID_KATANA",
