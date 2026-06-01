@@ -94,15 +94,27 @@ class KatanaUIFields(BaseUIFields):
         self.add_text_field("defaultResolution.width",  "Image Details", "Image Width",  1, 0, width,  3)
         self.add_text_field("defaultResolution.height", "Image Details", "Image Height", 2, 0, height, 3)
 
+        # File extension — default from the first render node's detected extension
+        _detected_exts = [
+            data.get("file_extension", {}).get("final")
+            for entry in render_nodes
+            for data in entry.values()
+            if data.get("file_extension", {}).get("final")
+        ]
+        _default_ext = _detected_exts[0] if _detected_exts else "exr"
+        self.add_select_field(
+            "file_extension", "Image Details", "File Extension",
+            3, 0, ["exr", "png", "jpeg", "tiff"], _default_ext, 3,
+        )
+
         # ------------------------------------------------------------------
         # SECTION 4 — Render Nodes
         # ------------------------------------------------------------------
         self.add_checkbox_field("is_job_per_render_node", "Render Nodes", "Single Job / Job Per Node", 0, 0, False, 4)
-        for i, rnode in enumerate(render_nodes):
-            nname = rnode.get("name", "")
-            nrole = rnode.get("role", "render")
-            if nrole == "render":
-                self.add_checkbox_field(nname, "Render Nodes", nname, i + 1, 0, True, 4)
+        for i, rnode_entry in enumerate(render_nodes):
+            for nname, rnode_data in rnode_entry.items():
+                if rnode_data.get("role", "render") == "render":
+                    self.add_checkbox_field(nname, "Render Nodes", nname, i + 1, 0, True, 4)
 
         # ------------------------------------------------------------------
         # SECTION 5 — Renderer Pool

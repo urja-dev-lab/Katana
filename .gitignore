@@ -5,6 +5,8 @@ repath_log.txt
 repath_report.json
 maya_file_list.txt
 repath_log.txt
+.bkp
+scrap.json
 
 # Ignore Python cache directories
 __pycache__/

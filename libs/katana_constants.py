@@ -31,6 +31,7 @@ FILE_LIST = "katana_file_list.txt"
 WEB_JSON_FILE = "web_ui_data.json"
 REPATH_LOG_FILE = "repath_log.txt"
 REPATH_REPORT_FILE = "repath_report.json"
+RENDER_LOG_FILE = "render_log.txt"
 
 # Katana parameter name keywords that suggest file paths
 FILE_PARAM_KEYWORDS = {

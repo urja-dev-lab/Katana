@@ -205,8 +205,10 @@ class KatanaRepathAsset:
         }
 
         render_settings_nodes = [
-            n for n in self.json_data.get("render_nodes", [])
-            if n.get("role") == "settings"
+            data
+            for entry in self.json_data.get("render_nodes", [])
+            for data in entry.values()
+            if data.get("role") == "settings"
         ]
 
         applied = []

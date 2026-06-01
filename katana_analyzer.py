@@ -165,13 +165,16 @@ def _collect_assets(scene_path, project_root, dh, logger):
 
             if is_udim_path(resolved):
                 meta = {"asset_type": _asset_type(resolved), "is_udim": True}
-                dh.add_sequence_asset(resolved, nname, param_path, logger, meta)
-                logger.log("UDIM asset: {} [{}:{}]".format(resolved, nname, param_path))
+                result, _ = dh.add_sequence_asset(resolved, nname, param_path, logger, meta)
+                if result:
+                    logger.log("UDIM asset: {} [{}:{}]".format(resolved, nname, param_path))
             else:
+                if not os.path.exists(resolved):
+                    logger.log("MISSING (skipped): {} [{}:{}]".format(resolved, nname, param_path))
+                    continue
                 meta = {"asset_type": _asset_type(resolved)}
                 dh.add_path_and_asset(resolved, nname, param_path, meta)
-                logger.log("Asset: {} [{}:{}] exists={}".format(
-                    resolved, nname, param_path, os.path.exists(resolved)))
+                logger.log("Asset: {} [{}:{}]".format(resolved, nname, param_path))
 
     # Always include the scene file itself
     scene_rel = os.path.relpath(os.path.dirname(scene_path), project_root)
@@ -241,12 +244,14 @@ def _collect_ocio(logger):
 # ---------------------------------------------------------------------------
 
 class KatanaAnalyzer:
-    def __init__(self, scene_path, sync_dir, profile_json_path, logger, logger_path):
+    def __init__(self, scene_path, sync_dir, profile_json_path, logger, logger_path,
+                 is_path_relative=False):
         self.scene_path = normalize_path(scene_path)
         self.sync_dir = normalize_path(sync_dir)
         self.profile_json_path = profile_json_path
         self.logger = logger
         self.logger_path = logger_path
+        self.is_path_relative = is_path_relative
 
         self._profile_json = {}
         if profile_json_path and os.path.exists(profile_json_path):
@@ -257,7 +262,7 @@ class KatanaAnalyzer:
                 logger.log("WARNING: Could not load profile JSON: {}".format(exc))
 
         self.project_root = get_project_root(scene_path)
-        self.dh = DataHandler(self.project_root)
+        self.dh = DataHandler(self.project_root, is_path_relative=is_path_relative)
 
         renderfarm_dir = os.path.join(sync_dir, LOG_DIR)
         os.makedirs(renderfarm_dir, exist_ok=True)
@@ -410,7 +415,7 @@ class _NullMessenger:
 # Public main() — called by katana_scene_tool or directly
 # ---------------------------------------------------------------------------
 
-def main(scene_path, sync_dir, profile_json_path=None):
+def main(scene_path, sync_dir, profile_json_path=None, is_path_relative=False):
     logger, logger_path = get_logger(scene_path, sync_dir)
     try:
         analyzer = KatanaAnalyzer(
@@ -419,6 +424,7 @@ def main(scene_path, sync_dir, profile_json_path=None):
             profile_json_path=profile_json_path,
             logger=logger,
             logger_path=logger_path,
+            is_path_relative=is_path_relative,
         )
         analyzer.run()
         logger.add_header("SUCCESS")
@@ -430,11 +436,13 @@ def main(scene_path, sync_dir, profile_json_path=None):
 
 if __name__ == "__main__":
     _args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
-    if len(_args) < 2:
-        print("Usage: katana --batch --script katana_analyzer.py -- <scene.katana> <sync_dir> [profile_json]")
+    _positional = [a for a in _args if not a.startswith("--")]
+    if len(_positional) < 2:
+        print("Usage: katana --batch --script katana_analyzer.py -- <scene.katana> <sync_dir> [profile_json] [--relative-paths]")
         sys.exit(1)
     main(
-        scene_path=os.path.abspath(_args[0]),
-        sync_dir=os.path.abspath(_args[1]),
-        profile_json_path=_args[2] if len(_args) > 2 else None,
+        scene_path=os.path.abspath(_positional[0]),
+        sync_dir=os.path.abspath(_positional[1]),
+        profile_json_path=_positional[2] if len(_positional) > 2 else None,
+        is_path_relative="--relative-paths" in _args,
     )
